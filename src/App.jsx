@@ -14,9 +14,7 @@ function App() {
   const [toast, setToast] = useState(null); // { message, type, undoAction }
   const toastTimeoutRef = useRef(null);
 
-  useEffect(() => {
-    localStorage.setItem('internship_applications', JSON.stringify(applications));
-  }, [applications]);
+
 
   const showToast = (message, type = 'info', undoAction = null) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -144,11 +142,25 @@ function App() {
     );
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  };
+
+  if (!session) {
+    return <Auth />;
+  }
+
   return (
     <div className="container">
-      <header>
-        <h1>Internship Tracker</h1>
-        <p className="subtitle">Manage and track your career opportunities with ease.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1>Internship Tracker</h1>
+          <p className="subtitle">Manage and track your career opportunities with ease.</p>
+        </div>
+        <button className="delete-btn" style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }} onClick={handleLogout}>
+          Log Out
+        </button>
       </header>
 
       <div className="input-section">
