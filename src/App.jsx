@@ -27,6 +27,16 @@ function App() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [applications, setApplications] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  const filteredApplications = applications.filter(app => {
+    const matchesSearch =
+      app.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.position.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'All' || app.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   // Toast State
   const [toast, setToast] = useState(null); // { message, type, undoAction }
@@ -254,6 +264,27 @@ function App() {
         </button>
       </div>
 
+      <div className="filter-section" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Search company or position..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)', background: 'var(--card-bg)', color: 'white' }}
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{ padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)', background: 'var(--card-bg)', color: 'white' }}
+        >
+          <option value="All">All Statuses</option>
+          {STATUS_OPTIONS.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="table-container">
         <table>
           <thead>
@@ -267,9 +298,10 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {applications.map((app) => (
+            {filteredApplications.map((app) => (
               <tr key={app.id}>
                 <td
+                  data-label="Company"
                   contentEditable
                   suppressContentEditableWarning
                   className="editable"
@@ -278,6 +310,7 @@ function App() {
                   {app.company}
                 </td>
                 <td
+                  data-label="Position"
                   contentEditable
                   suppressContentEditableWarning
                   className="editable"
@@ -285,7 +318,7 @@ function App() {
                 >
                   {app.position}
                 </td>
-                <td>
+                <td data-label="Date Applied">
                   <input
                     type="date"
                     value={app.date}
@@ -293,7 +326,7 @@ function App() {
                     onChange={(e) => handleUpdate(app.id, 'date', e.target.value)}
                   />
                 </td>
-                <td>
+                <td data-label="Status">
                   <select
                     value={app.status}
                     className={`status-badge status-${app.status.toLowerCase()}`}
@@ -305,21 +338,21 @@ function App() {
                     ))}
                   </select>
                 </td>
-                <td>
+                <td data-label="Link">
                   {app.url ? (
                     <a href={app.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
                       🔗 Visit
                     </a>
                   ) : '-'}
                 </td>
-                <td style={{ textAlign: 'right' }}>
+                <td data-label="Actions" style={{ textAlign: 'right' }}>
                   <button className="delete-btn" onClick={() => handleDelete(app.id)}>
                     🗑️
                   </button>
                 </td>
               </tr>
             ))}
-            {applications.length === 0 && (
+            {filteredApplications.length === 0 && (
               <tr>
                 <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>
                   No applications yet. Paste a link above to start!

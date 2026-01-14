@@ -304,3 +304,99 @@ tr:hover .delete-btn {
 .toast-close-btn:hover {
   color: #fff;
 }
+
+/* Mobile Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 1.5rem 1rem;
+  }
+
+  header {
+    margin-bottom: 2rem;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  .input-section {
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .add-btn {
+    width: 100%;
+  }
+
+  /* Table to Card Transformation */
+  thead {
+    display: none;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  tr {
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  tr:last-child {
+    margin-bottom: 0;
+  }
+
+  td {
+    padding: 0.5rem 0;
+    text-align: right;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  td:last-child {
+    border-bottom: none;
+  }
+
+  td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    margin-right: 1rem;
+  }
+
+  /* Adjust inputs in mobile card */
+  td input[type="date"] {
+    text-align: right;
+  }
+
+  .status-badge {
+    width: auto;
+  }
+
+  /* Make content editable feel clickable */
+  .editable {
+    text-align: right;
+    width: 60%;
+    margin-left: auto;
+  }
+}
+
+/* Filter Section Styles */
+.search-input:focus,
+.filter-section select:focus {
+  border-color: var(--accent-primary) !important;
+  outline: none;
+}
