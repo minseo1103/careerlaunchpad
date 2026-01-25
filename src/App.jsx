@@ -45,6 +45,15 @@ function App() {
     return matchesSearch && matchesStatus;
   });
 
+  // Calculate Stats
+  const stats = {
+    total: applications.length,
+    pending: applications.filter(app => app.status === 'Pending').length,
+    interview: applications.filter(app => app.status === 'Interview').length,
+    accepted: applications.filter(app => app.status === 'Accepted').length,
+    decline: applications.filter(app => app.status === 'Decline').length,
+  };
+
   // Toast State
   const [toast, setToast] = useState(null); // { message, type, undoAction }
   const toastTimeoutRef = useRef(null);
@@ -115,7 +124,8 @@ function App() {
         position,
         date: new Date().toISOString().split('T')[0],
         status: 'Pending',
-        url: targetUrl || ''
+        url: targetUrl || '',
+        notes: ''
       };
 
       const { data, error } = await supabase
@@ -141,7 +151,8 @@ function App() {
             position: 'Edit Position',
             date: new Date().toISOString().split('T')[0],
             status: 'Pending',
-            url: targetUrl
+            url: targetUrl,
+            notes: ''
           };
           const { data: manualData, error: manualError } = await supabase
             .from('applications')
@@ -250,18 +261,42 @@ function App() {
           <div className="loading" style={{ width: '3rem', height: '3rem', borderWidth: '4px' }}></div>
         </div>
       )}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="app-header">
         <div>
           <h1>Internship Tracker</h1>
           <p className="subtitle">Manage and track your career opportunities with ease.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{session.user.email}</span>
-          <button className="delete-btn" style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }} onClick={handleLogout}>
+        <div className="user-actions">
+          <span className="user-email">{session.user.email}</span>
+          <button className="delete-btn logout-btn" onClick={handleLogout}>
             Log Out
           </button>
         </div>
       </header>
+
+      {/* Dashboard Stats */}
+      <div className="dashboard-grid">
+        <div className="stat-card">
+          <h3>Total</h3>
+          <p>{stats.total}</p>
+        </div>
+        <div className="stat-card stat-pending">
+          <h3>Pending</h3>
+          <p>{stats.pending}</p>
+        </div>
+        <div className="stat-card stat-interview">
+          <h3>Interview</h3>
+          <p>{stats.interview}</p>
+        </div>
+        <div className="stat-card stat-accepted">
+          <h3>Accepted</h3>
+          <p>{stats.accepted}</p>
+        </div>
+        <div className="stat-card stat-decline">
+          <h3>Declined</h3>
+          <p>{stats.decline}</p>
+        </div>
+      </div>
 
       <div className="input-section">
         <input
@@ -304,6 +339,7 @@ function App() {
               <th>Position</th>
               <th>Date Applied</th>
               <th>Status</th>
+              <th>Notes</th>
               <th>Link</th>
               <th></th>
             </tr>
@@ -349,6 +385,15 @@ function App() {
                     ))}
                   </select>
                 </td>
+                <td
+                  data-label="Notes"
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="editable notes-cell"
+                  onBlur={(e) => handleUpdate(app.id, 'notes', e.target.innerText)}
+                >
+                  {app.notes || ''}
+                </td>
                 <td data-label="Link">
                   {app.url ? (
                     <a href={app.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
@@ -365,7 +410,7 @@ function App() {
             ))}
             {filteredApplications.length === 0 && (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>
+                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>
                   No applications yet. Paste a link above to start!
                 </td>
               </tr>

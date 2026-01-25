@@ -53,82 +53,38 @@ export default function Auth() {
     }
 
     return (
-        <div className="auth-container" style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100vh',
-            background: 'var(--bg-color)'
-        }}>
-            <div className="auth-box" style={{
-                padding: '2rem',
-                borderRadius: '12px',
-                background: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                width: '100%',
-                maxWidth: '400px',
-                textAlign: 'center'
-            }}>
-                <h1 style={{ marginBottom: '1.5rem', fontSize: '1.8rem' }}>Welcome Back</h1>
-                <p style={{ marginBottom: '2rem', color: 'var(--text-muted)' }}>Sign in to access your dashboard</p>
+        <div className="auth-container">
+            <div className="auth-box">
+                <h1 className="auth-title">Welcome Back</h1>
+                <p className="auth-subtitle">Sign in to access your dashboard</p>
 
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {errorMsg && <div className="auth-error">{errorMsg}</div>}
+
+                <form onSubmit={handleLogin} className="auth-form">
                     <input
-                        className="input"
+                        className="auth-input"
                         type="text"
                         placeholder="Username"
                         value={username}
                         required={true}
                         onChange={(e) => setUsername(e.target.value)}
-                        style={{
-                            padding: '0.75rem',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--bg-tertiary)',
-                            color: 'var(--text-primary)',
-                            fontSize: '1rem'
-                        }}
                     />
                     <input
-                        className="input"
+                        className="auth-input"
                         type="password"
                         placeholder="Password"
                         value={password}
                         required={true}
                         onChange={(e) => setPassword(e.target.value)}
-                        style={{
-                            padding: '0.75rem',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--bg-tertiary)',
-                            color: 'var(--text-primary)',
-                            fontSize: '1rem'
-                        }}
                     />
-                    <button className="button block" disabled={loading} style={{
-                        padding: '0.75rem',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: 'var(--accent-primary)',
-                        color: 'white',
-                        fontSize: '1rem',
-                        cursor: 'pointer',
-                        marginTop: '0.5rem'
-                    }}>
-                        {loading ? <span>Loading</span> : <span>Log In</span>}
+                    <button className="auth-button" disabled={loading}>
+                        {loading ? <span>Loading...</span> : <span>Log In</span>}
                     </button>
                 </form>
 
-                <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Don't have an account?</p>
-                    <button onClick={handleSignUp} disabled={loading} style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--accent-primary)',
-                        cursor: 'pointer',
-                        fontWeight: '500'
-                    }}>
+                <div className="auth-divider">
+                    <p className="auth-signup-text">Don't have an account?</p>
+                    <button className="auth-signup-btn" onClick={handleSignUp} disabled={loading}>
                         Sign Up
                     </button>
                 </div>
