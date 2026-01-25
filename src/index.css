@@ -861,8 +861,6 @@ tr:hover .delete-btn {
     font-size: 1rem;
   }
 }
-  background: var(--bg-color);
-}
 
 .auth-box {
   padding: 2rem;
