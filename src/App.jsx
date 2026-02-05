@@ -23,6 +23,30 @@ const DEFAULT_VISIBLE_COLUMNS = {
   link: true,
   actions: true
 };
+
+const DEFAULT_PREP = {
+  company: {
+    oneLiner: '',
+    productMarket: '',
+    motivation: '',
+    links: ''
+  },
+  role: {
+    summary: '',
+    requirements: '',
+    fit: ''
+  },
+  jd: {
+    text: '',
+    keywords: []
+  },
+  interview: {
+    questions: '',
+    myAnswers: '',
+    questionsToAsk: ''
+  }
+};
+
 const COPY = {
   en: {
     helpTitle: 'How to Use Career Launchpad',
@@ -55,7 +79,30 @@ const COPY = {
     help: 'Help',
     language: 'Language',
     langEn: 'English',
-    langKo: 'Korean'
+    langKo: 'Korean',
+    prepOpen: 'Prep',
+    prepTitle: 'Prep Sheet',
+    prepCompany: 'Company',
+    prepRole: 'Role',
+    prepJD: 'JD & Keywords',
+    prepInterview: 'Interview Prep',
+    prepRisk: 'Risk Signals',
+    companyOneLiner: 'One-liner (what the company does)',
+    companyProductMarket: 'Product / Market notes',
+    companyMotivation: 'Why this company?',
+    companyLinks: 'Links (one per line)',
+    roleSummary: 'Role summary',
+    roleRequirements: 'Key requirements',
+    roleFit: 'My matching experiences',
+    jdPaste: 'Paste the job description (JD)',
+    jdKeywords: 'Keywords (comma-separated)',
+    extractKeywords: 'Extract',
+    interviewQuestions: 'Likely questions',
+    interviewMyAnswers: 'My answers / stories',
+    interviewQuestionsToAsk: 'Questions to ask the interviewer',
+    cancel: 'Cancel',
+    save: 'Save',
+    saving: 'Saving...'
   },
   ko: {
     helpTitle: 'Career Launchpad 사용 방법',
@@ -88,7 +135,30 @@ const COPY = {
     help: '도움말',
     language: '언어',
     langEn: '영어',
-    langKo: '한국어'
+    langKo: '한국어',
+    prepOpen: '준비',
+    prepTitle: '지원 준비 시트',
+    prepCompany: '회사',
+    prepRole: '직무',
+    prepJD: 'JD & 키워드',
+    prepInterview: '면접 준비',
+    prepRisk: '리스크 신호',
+    companyOneLiner: '한 줄 요약 (회사 소개)',
+    companyProductMarket: '제품/시장 메모',
+    companyMotivation: '지원 동기',
+    companyLinks: '링크 (줄바꿈으로 입력)',
+    roleSummary: '직무 요약',
+    roleRequirements: '핵심 요건',
+    roleFit: '내 경험 매칭',
+    jdPaste: '채용 공고 내용(JD) 붙여넣기',
+    jdKeywords: '키워드 (콤마로 구분)',
+    extractKeywords: '추출',
+    interviewQuestions: '예상 질문',
+    interviewMyAnswers: '내 답변/사례',
+    interviewQuestionsToAsk: '면접관에게 할 질문',
+    cancel: '취소',
+    save: '저장',
+    saving: '저장 중...'
   }
 };
 
@@ -129,6 +199,10 @@ function App() {
   const [editingValue, setEditingValue] = useState('');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
+  const [isPrepOpen, setIsPrepOpen] = useState(false);
+  const [prepAppId, setPrepAppId] = useState(null);
+  const [prepDraft, setPrepDraft] = useState(null);
+  const [isPrepSaving, setIsPrepSaving] = useState(false);
   const [language, setLanguage] = useState(() => {
     try {
       return localStorage.getItem('uiLanguage') || 'en';
@@ -145,6 +219,7 @@ function App() {
     }
   });
   const columnsRef = useRef(null);
+  const prepInitialRef = useRef('');
 
   const filteredApplications = applications.filter(app => {
     const matchesSearch =
@@ -180,6 +255,17 @@ function App() {
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isHelpOpen]);
+
+  useEffect(() => {
+    if (!isPrepOpen) return;
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        closePrep();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isPrepOpen, prepDraft]);
 
   useEffect(() => {
     if (!isColumnsOpen) return;
@@ -221,6 +307,54 @@ function App() {
     } catch {
       return value.toLowerCase().trim();
     }
+  };
+
+  const normalizePrep = (rawPrep = {}, app = null) => {
+    const safePrep = rawPrep && typeof rawPrep === 'object' && !Array.isArray(rawPrep) ? rawPrep : {};
+    const merged = {
+      ...DEFAULT_PREP,
+      ...safePrep,
+      company: { ...DEFAULT_PREP.company, ...(safePrep.company || {}) },
+      role: { ...DEFAULT_PREP.role, ...(safePrep.role || {}) },
+      jd: { ...DEFAULT_PREP.jd, ...(safePrep.jd || {}) },
+      interview: { ...DEFAULT_PREP.interview, ...(safePrep.interview || {}) }
+    };
+
+    if (!Array.isArray(merged.jd.keywords)) merged.jd.keywords = [];
+    merged.jd.keywords = merged.jd.keywords.map(String).map(s => s.trim()).filter(Boolean);
+
+    if (app?.url && !merged.company.links.trim()) {
+      merged.company.links = app.url;
+    }
+
+    return merged;
+  };
+
+  const extractKeywordsFromText = (text) => {
+    const input = (text || '').toLowerCase();
+    const stop = new Set([
+      'a', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for', 'from', 'has', 'have', 'how',
+      'i', 'in', 'is', 'it', 'its', 'job', 'more', 'of', 'on', 'or', 'our', 'role', 'the', 'their',
+      'they', 'this', 'to', 'we', 'will', 'with', 'you', 'your', 'years', 'year', 'experience',
+      'work', 'working', 'team', 'ability', 'skills', 'strong', 'including', 'preferred', 'plus'
+    ]);
+
+    const tokens = input.match(/[a-z0-9][a-z0-9+.#/\\-]{1,30}/g) || [];
+    const counts = new Map();
+
+    for (const token of tokens) {
+      const t = token.trim();
+      if (!t) continue;
+      if (t.length < 2) continue;
+      if (stop.has(t)) continue;
+      if (/^\d+$/.test(t)) continue;
+      counts.set(t, (counts.get(t) || 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([word]) => word);
   };
 
   const getRiskAssessment = (app) => {
@@ -467,6 +601,79 @@ function App() {
     });
   };
 
+  const openPrep = (app) => {
+    const normalized = normalizePrep(app.prep, app);
+    setPrepAppId(app.id);
+    setPrepDraft(normalized);
+    prepInitialRef.current = JSON.stringify(normalized);
+    setIsPrepOpen(true);
+  };
+
+  const closePrep = () => {
+    if (prepDraft) {
+      const now = JSON.stringify(prepDraft);
+      if (now !== prepInitialRef.current) {
+        const proceed = window.confirm('You have unsaved changes. Close without saving?');
+        if (!proceed) return;
+      }
+    }
+    setIsPrepOpen(false);
+    setPrepAppId(null);
+    setPrepDraft(null);
+    setIsPrepSaving(false);
+    prepInitialRef.current = '';
+  };
+
+  const updatePrep = (section, field, value) => {
+    setPrepDraft(prev => {
+      const base = prev || normalizePrep({}, null);
+      return { ...base, [section]: { ...base[section], [field]: value } };
+    });
+  };
+
+  const updatePrepKeywords = (value) => {
+    const keywords = (value || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    setPrepDraft(prev => {
+      const base = prev || normalizePrep({}, null);
+      return { ...base, jd: { ...base.jd, keywords } };
+    });
+  };
+
+  const extractKeywordsIntoPrep = () => {
+    setPrepDraft(prev => {
+      const base = prev || normalizePrep({}, null);
+      const keywords = extractKeywordsFromText(base.jd.text);
+      return { ...base, jd: { ...base.jd, keywords } };
+    });
+  };
+
+  const savePrep = async () => {
+    if (!prepAppId || !prepDraft) return;
+    const previousApps = [...applications];
+    setApplications(prev =>
+      prev.map(app => (app.id === prepAppId ? { ...app, prep: prepDraft } : app))
+    );
+    setIsPrepSaving(true);
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .update({ prep: prepDraft })
+        .eq('id', prepAppId);
+      if (error) throw error;
+      prepInitialRef.current = JSON.stringify(prepDraft);
+      showToast('Prep sheet saved', 'success');
+    } catch (error) {
+      console.error('Error saving prep sheet:', error);
+      setApplications(previousApps);
+      showToast('Failed to save prep sheet', 'error');
+    } finally {
+      setIsPrepSaving(false);
+    }
+  };
+
   const startEditing = (app, field) => {
     setEditingCell({ id: app.id, field });
     setEditingValue(app[field] || '');
@@ -559,6 +766,7 @@ function App() {
   }
 
   const content = COPY[language] || COPY.en;
+  const prepApp = prepAppId ? applications.find(app => app.id === prepAppId) : null;
 
   return (
     <div className="container">
@@ -811,9 +1019,18 @@ function App() {
                 )}
                 {visibleColumns.actions && (
                   <td data-label="Actions" style={{ textAlign: 'right' }}>
-                    <button className="delete-btn" onClick={() => handleDelete(app.id)}>
-                      🗑️
-                    </button>
+                    <div className="row-actions">
+                      <button
+                        className="icon-btn"
+                        title={content.prepOpen}
+                        onClick={() => openPrep(app)}
+                      >
+                        📝
+                      </button>
+                      <button className="delete-btn" onClick={() => handleDelete(app.id)}>
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 )}
               </tr>
@@ -921,6 +1138,190 @@ function App() {
             <div className="modal-actions">
               <button className="add-btn" onClick={() => setIsHelpOpen(false)}>
                 {content.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPrepOpen && prepDraft && prepApp && (
+        <div className="modal-overlay" onClick={closePrep}>
+          <div className="modal prep-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{content.prepTitle}</h2>
+                <p className="prep-subtitle">{prepApp.company} · {prepApp.position}</p>
+              </div>
+              <div className="modal-header-actions">
+                <button className="secondary-btn" onClick={savePrep} disabled={isPrepSaving}>
+                  {isPrepSaving ? content.saving : content.save}
+                </button>
+                <button className="modal-close" onClick={closePrep}>
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="prep-grid">
+              <div className="prep-card">
+                <h3>{content.prepCompany}</h3>
+                <label className="form-field">
+                  <span className="form-label">{content.companyOneLiner}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.company.oneLiner}
+                    onChange={(e) => updatePrep('company', 'oneLiner', e.target.value)}
+                    rows={2}
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">{content.companyProductMarket}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.company.productMarket}
+                    onChange={(e) => updatePrep('company', 'productMarket', e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">{content.companyMotivation}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.company.motivation}
+                    onChange={(e) => updatePrep('company', 'motivation', e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">{content.companyLinks}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.company.links}
+                    onChange={(e) => updatePrep('company', 'links', e.target.value)}
+                    rows={3}
+                  />
+                </label>
+              </div>
+
+              <div className="prep-card">
+                <h3>{content.prepRole}</h3>
+                <label className="form-field">
+                  <span className="form-label">{content.roleSummary}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.role.summary}
+                    onChange={(e) => updatePrep('role', 'summary', e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">{content.roleRequirements}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.role.requirements}
+                    onChange={(e) => updatePrep('role', 'requirements', e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">{content.roleFit}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.role.fit}
+                    onChange={(e) => updatePrep('role', 'fit', e.target.value)}
+                    rows={4}
+                  />
+                </label>
+              </div>
+
+              <div className="prep-card prep-wide">
+                <div className="prep-wide-header">
+                  <h3>{content.prepJD}</h3>
+                  <button className="secondary-btn" onClick={extractKeywordsIntoPrep} type="button">
+                    {content.extractKeywords}
+                  </button>
+                </div>
+                <label className="form-field">
+                  <span className="form-label">{content.jdPaste}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.jd.text}
+                    onChange={(e) => updatePrep('jd', 'text', e.target.value)}
+                    rows={6}
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">{content.jdKeywords}</span>
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={prepDraft.jd.keywords.join(', ')}
+                    onChange={(e) => updatePrepKeywords(e.target.value)}
+                    placeholder="e.g., react, sql, python"
+                  />
+                </label>
+              </div>
+
+              <div className="prep-card prep-wide">
+                <h3>{content.prepInterview}</h3>
+                <div className="prep-two-col">
+                  <label className="form-field">
+                    <span className="form-label">{content.interviewQuestions}</span>
+                    <textarea
+                      className="form-textarea"
+                      value={prepDraft.interview.questions}
+                      onChange={(e) => updatePrep('interview', 'questions', e.target.value)}
+                      rows={6}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span className="form-label">{content.interviewMyAnswers}</span>
+                    <textarea
+                      className="form-textarea"
+                      value={prepDraft.interview.myAnswers}
+                      onChange={(e) => updatePrep('interview', 'myAnswers', e.target.value)}
+                      rows={6}
+                    />
+                  </label>
+                </div>
+                <label className="form-field">
+                  <span className="form-label">{content.interviewQuestionsToAsk}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.interview.questionsToAsk}
+                    onChange={(e) => updatePrep('interview', 'questionsToAsk', e.target.value)}
+                    rows={3}
+                  />
+                </label>
+              </div>
+
+              <div className="prep-card prep-wide">
+                <h3>{content.prepRisk}</h3>
+                {(() => {
+                  const risk = getRiskAssessment(prepApp);
+                  return (
+                    <div className="risk-panel">
+                      <div className="risk-panel-header">
+                        <span className={`risk-badge risk-${risk.level.toLowerCase()}`}>{risk.level}</span>
+                        <span className="risk-panel-hint">Heuristic signals (not a verdict)</span>
+                      </div>
+                      <ul className="risk-list">
+                        {risk.signals.map(signal => (
+                          <li key={signal}>{signal}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="secondary-btn" onClick={closePrep} type="button">
+                {content.cancel}
+              </button>
+              <button className="add-btn" onClick={savePrep} disabled={isPrepSaving}>
+                {isPrepSaving ? content.saving : content.save}
               </button>
             </div>
           </div>
