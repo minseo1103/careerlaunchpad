@@ -704,10 +704,16 @@ tr:hover .delete-btn {
 
   .search-input,
   .filter-select,
-  .columns-toggle {
+  .columns-button {
     width: 100%;
     padding: 0.65rem;
     font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .columns-popover {
+    right: auto;
+    left: 0;
+    width: 100%;
   }
 
   /* Table to Card Transformation */
@@ -955,31 +961,41 @@ tr:hover .delete-btn {
   outline: none;
 }
 
-.columns-toggle {
+.columns-wrapper {
   position: relative;
+}
+
+.columns-button {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--surface);
-  padding: 0.35rem 0.6rem;
+  padding: 0.65rem 0.9rem;
   font-size: 0.9rem;
   color: var(--text-main);
-  min-width: 140px;
-}
-
-.columns-toggle summary {
-  list-style: none;
   cursor: pointer;
   font-weight: 600;
+  transition: background 0.2s, border-color 0.2s;
+  min-width: 110px;
 }
 
-.columns-toggle summary::-webkit-details-marker {
-  display: none;
+.columns-button:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
-.columns-menu {
-  margin-top: 0.5rem;
+.columns-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+  padding: 0.6rem 0.75rem;
   display: grid;
   gap: 0.4rem;
+  min-width: 180px;
+  z-index: 10;
 }
 
 .columns-item {

@@ -128,6 +128,7 @@ function App() {
   const [editingCell, setEditingCell] = useState(null); // { id, field }
   const [editingValue, setEditingValue] = useState('');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isColumnsOpen, setIsColumnsOpen] = useState(false);
   const [language, setLanguage] = useState(() => {
     try {
       return localStorage.getItem('uiLanguage') || 'en';
@@ -143,6 +144,7 @@ function App() {
       return DEFAULT_VISIBLE_COLUMNS;
     }
   });
+  const columnsRef = useRef(null);
 
   const filteredApplications = applications.filter(app => {
     const matchesSearch =
@@ -178,6 +180,26 @@ function App() {
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isHelpOpen]);
+
+  useEffect(() => {
+    if (!isColumnsOpen) return;
+    const handleClickOutside = (event) => {
+      if (columnsRef.current && !columnsRef.current.contains(event.target)) {
+        setIsColumnsOpen(false);
+      }
+    };
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsColumnsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isColumnsOpen]);
 
   const companyOptions = useMemo(() => {
     const set = new Set(applications.map(app => (app.company || '').trim()).filter(Boolean));
@@ -616,23 +638,31 @@ function App() {
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
-        <details className="columns-toggle">
-          <summary>Columns</summary>
-          <div className="columns-menu">
-            {Object.entries(COLUMN_LABELS).map(([key, label]) => (
-              <label key={key} className="columns-item">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns[key]}
-                  onChange={() =>
-                    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }))
-                  }
-                />
-                <span>{label}</span>
-              </label>
-            ))}
-          </div>
-        </details>
+        <div className="columns-wrapper" ref={columnsRef}>
+          <button
+            className="columns-button"
+            type="button"
+            onClick={() => setIsColumnsOpen(prev => !prev)}
+          >
+            Columns
+          </button>
+          {isColumnsOpen && (
+            <div className="columns-popover">
+              {Object.entries(COLUMN_LABELS).map(([key, label]) => (
+                <label key={key} className="columns-item">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns[key]}
+                    onChange={() =>
+                      setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }))
+                    }
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="table-container">
