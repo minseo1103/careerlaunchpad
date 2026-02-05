@@ -556,6 +556,12 @@ tr:hover .delete-btn {
   margin-bottom: 0.75rem;
 }
 
+.modal-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .modal-header h2 {
   font-size: 1.4rem;
   margin: 0;
@@ -641,24 +647,6 @@ tr:hover .delete-btn {
   .user-actions {
     width: 100%;
     justify-content: space-between;
-  }
-
-  .language-toggle {
-    order: 1;
-    width: 100%;
-    justify-content: center;
-  }
-
-  .help-btn {
-    order: 2;
-  }
-
-  .user-email {
-    order: 3;
-  }
-
-  .logout-btn {
-    order: 4;
   }
 
   .user-email {

@@ -551,21 +551,6 @@ function App() {
           <p className="subtitle">Manage and track your career opportunities with ease.</p>
         </div>
         <div className="user-actions">
-          <div className="language-toggle">
-            <span className="language-label">{content.language}</span>
-            <button
-              className={`language-btn ${language === 'en' ? 'active' : ''}`}
-              onClick={() => setLanguage('en')}
-            >
-              {content.langEn}
-            </button>
-            <button
-              className={`language-btn ${language === 'ko' ? 'active' : ''}`}
-              onClick={() => setLanguage('ko')}
-            >
-              {content.langKo}
-            </button>
-          </div>
           <button className="help-btn" onClick={() => setIsHelpOpen(true)}>
             {content.help}
           </button>
@@ -835,9 +820,26 @@ function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{content.helpTitle}</h2>
-              <button className="modal-close" onClick={() => setIsHelpOpen(false)}>
-                ×
-              </button>
+              <div className="modal-header-actions">
+                <div className="language-toggle">
+                  <span className="language-label">{content.language}</span>
+                  <button
+                    className={`language-btn ${language === 'en' ? 'active' : ''}`}
+                    onClick={() => setLanguage('en')}
+                  >
+                    {content.langEn}
+                  </button>
+                  <button
+                    className={`language-btn ${language === 'ko' ? 'active' : ''}`}
+                    onClick={() => setLanguage('ko')}
+                  >
+                    {content.langKo}
+                  </button>
+                </div>
+                <button className="modal-close" onClick={() => setIsHelpOpen(false)}>
+                  ×
+                </button>
+              </div>
             </div>
             <p className="modal-intro">{content.helpIntro}</p>
 
