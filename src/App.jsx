@@ -74,7 +74,9 @@ const COPY = {
     ],
     sectionPrivacy: 'Privacy',
     privacy: [
-      'Your data is stored in your Supabase project. No third-party risk databases are used.'
+      'Your data is stored in your Supabase project.',
+      'When you use Auto-fill, the job/company page text and URLs may be sent to OpenAI to generate structured notes.',
+      'No third-party risk databases are used.'
     ],
     close: 'Close',
     help: 'Help',
@@ -137,7 +139,9 @@ const COPY = {
     ],
     sectionPrivacy: '개인정보',
     privacy: [
-      '데이터는 본인 Supabase 프로젝트에 저장됩니다. 외부 리스크 DB는 사용하지 않습니다.'
+      '데이터는 본인 Supabase 프로젝트에 저장됩니다.',
+      '자동 채우기(Auto-fill)를 사용할 경우, 채용공고/회사 페이지 텍스트와 URL이 OpenAI로 전송되어 정리 결과를 생성할 수 있습니다.',
+      '외부 리스크 DB는 사용하지 않습니다.'
     ],
     close: '닫기',
     help: '도움말',
@@ -604,17 +608,6 @@ function App() {
     return { questions, myAnswers, questionsToAsk };
   };
 
-  const fetchMicrolink = async (targetUrl) => {
-    if (!targetUrl) return null;
-    const response = await fetch(`https://api.microlink.io?url=${encodeURIComponent(targetUrl)}`);
-    const json = await response.json();
-    if (json?.status !== 'success') {
-      const message = json?.error?.message || 'Microlink request failed';
-      throw new Error(message);
-    }
-    return json?.data || null;
-  };
-
   const extractUrls = (text) => {
     const input = String(text || '');
     const matches = input.match(/https?:\/\/[^\s)]+/g);
@@ -636,177 +629,21 @@ function App() {
     return nonBoard || urls[0];
   };
 
-  const buildCompanyTemplates = (lang, app, prep, info) => {
-    const company = (app?.company || '').trim() || '(Company)';
-    const role = (app?.position || '').trim() || '(Role)';
-    const title = (info?.title || '').trim();
-    const description = (info?.description || '').trim();
-    const publisher = (info?.publisher || '').trim();
-    const source = (info?.url || app?.url || '').trim();
+  const invokeAutofillPrep = async ({ mode, jobUrl, companyUrl }) => {
+    const { data, error } = await supabase.functions.invoke('autofill-prep', {
+      body: {
+        mode,
+        jobUrl,
+        companyUrl: companyUrl || undefined,
+        language,
+        companyName: prepApp?.company,
+        roleTitle: prepApp?.position
+      }
+    });
 
-    const derivedOneLiner = description
-      ? `${publisher && publisher !== company ? `${publisher} / ` : ''}${company}: ${description}`
-      : `${company} — (add what they do in one sentence)`;
-
-    const checklistEn = [
-      '[ ] Read homepage + product pages',
-      '[ ] Understand customer + problem',
-      '[ ] Scan pricing / business model (if applicable)',
-      '[ ] Read 2–3 recent posts/news',
-      '[ ] Identify 2 competitors',
-      '[ ] Prepare 3 “why us” reasons tied to the role'
-    ].join('\n');
-
-    const checklistKo = [
-      '[ ] 홈페이지/제품 페이지 읽기',
-      '[ ] 고객/문제 정의 정리',
-      '[ ] 가격/비즈니스 모델 확인(가능하면)',
-      '[ ] 최근 글/뉴스 2~3개 읽기',
-      '[ ] 경쟁사 2개 정리',
-      '[ ] 직무와 연결된 “왜 우리 회사?” 3가지 준비'
-    ].join('\n');
-
-    if (lang === 'ko') {
-      return {
-        oneLiner: derivedOneLiner.replace(`${company}: `, `${company} : `),
-        productMarket: [
-          `출처: ${source || '-'}`,
-          title ? `페이지 제목: ${title}` : null,
-          description ? `메타 설명: ${description}` : null,
-          '',
-          '제품/시장 메모(수정해서 채우기)',
-          '- 주요 제품/서비스:',
-          '- 타깃 고객:',
-          '- 해결하는 문제:',
-          '- 차별점/경쟁사:',
-          '- 최근 이슈/뉴스:'
-        ].filter(Boolean).join('\n'),
-        motivation: [
-          `${company} 지원 동기(초안)`,
-          `- 왜 ${company}?`,
-          '  1) ',
-          '  2) ',
-          '  3) ',
-          '',
-          `직무 연결(${role}):`,
-          '- JD 키워드/업무와 내 경험을 어떻게 연결할지:'
-        ].join('\n'),
-        researchChecklist: checklistKo
-      };
-    }
-
-    return {
-      oneLiner: derivedOneLiner,
-      productMarket: [
-        `Source: ${source || '-'}`,
-        title ? `Page title: ${title}` : null,
-        description ? `Meta description: ${description}` : null,
-        '',
-        'Product / Market notes (edit & fill)',
-        '- Core product/service:',
-        '- Target customers:',
-        '- Problem they solve:',
-        '- Differentiation / competitors:',
-        '- Recent news/updates:'
-      ].filter(Boolean).join('\n'),
-      motivation: [
-        `Why ${company}? (draft)`,
-        `- Why ${company}?`,
-        '  1) ',
-        '  2) ',
-        '  3) ',
-        '',
-        `Tie to role (${role}):`,
-        '- How my experience matches the role:'
-      ].join('\n'),
-      researchChecklist: checklistEn
-    };
-  };
-
-  const buildRoleTemplates = (lang, app, prep, info) => {
-    const company = (app?.company || '').trim() || '(Company)';
-    const role = (app?.position || '').trim() || '(Role)';
-    const description = (info?.description || '').trim();
-    const source = (info?.url || app?.url || '').trim();
-    const keywords = Array.isArray(prep?.jd?.keywords) ? prep.jd.keywords.slice(0, 10) : [];
-
-    if (lang === 'ko') {
-      return {
-        summary: [
-          `직무 요약: ${role} @ ${company}`,
-          '',
-          '주요 업무(추정/수정 필요)',
-          '- ',
-          '- ',
-          '- ',
-          '',
-          `출처: ${source || '-'}`,
-          description ? `메타 설명(참고): ${description}` : null
-        ].filter(Boolean).join('\n'),
-        requirements: [
-          '핵심 요건(초안)',
-          `- 핵심 키워드: ${keywords.length ? keywords.join(', ') : '(JD에서 Extract로 키워드를 뽑아봐)'}`,
-          '',
-          'Must-have',
-          '- ',
-          '- ',
-          '',
-          'Nice-to-have',
-          '- ',
-          '- '
-        ].join('\n'),
-        fit: [
-          '내 경험 매칭(작성 템플릿)',
-          '- 요건 1: ',
-          '  - 내 근거(프로젝트/경험): ',
-          '  - 임팩트(수치): ',
-          '- 요건 2: ',
-          '  - 내 근거(프로젝트/경험): ',
-          '  - 임팩트(수치): ',
-          '- 요건 3: ',
-          '  - 내 근거(프로젝트/경험): ',
-          '  - 임팩트(수치): '
-        ].join('\n')
-      };
-    }
-
-    return {
-      summary: [
-        `Role summary: ${role} @ ${company}`,
-        '',
-        'Core responsibilities (draft, edit as needed)',
-        '- ',
-        '- ',
-        '- ',
-        '',
-        `Source: ${source || '-'}`,
-        description ? `Meta description (reference): ${description}` : null
-      ].filter(Boolean).join('\n'),
-      requirements: [
-        'Key requirements (draft)',
-        `- Focus keywords: ${keywords.length ? keywords.join(', ') : '(Use Extract on the JD to get keywords)'}`,
-        '',
-        'Must-have',
-        '- ',
-        '- ',
-        '',
-        'Nice-to-have',
-        '- ',
-        '- '
-      ].join('\n'),
-      fit: [
-        'My matching experiences (template)',
-        '- Requirement 1: ',
-        '  - Evidence (project/experience): ',
-        '  - Impact (numbers): ',
-        '- Requirement 2: ',
-        '  - Evidence (project/experience): ',
-        '  - Impact (numbers): ',
-        '- Requirement 3: ',
-        '  - Evidence (project/experience): ',
-        '  - Impact (numbers): '
-      ].join('\n')
-    };
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    return data;
   };
 
   const getRiskAssessment = (app) => {
@@ -1142,15 +979,23 @@ function App() {
     if (!prepApp || !prepDraft) return;
     setIsCompanyAutofillLoading(true);
     try {
-      const companyUrl = pickCompanyUrlFromLinks(prepDraft.company.links) || prepApp.url;
-      const info = await fetchMicrolink(companyUrl);
-      const templates = buildCompanyTemplates(language, prepApp, prepDraft, info);
+      const companyUrl = pickCompanyUrlFromLinks(prepDraft.company.links) || '';
+      const data = await invokeAutofillPrep({ mode: 'company', jobUrl: prepApp.url, companyUrl });
+      const company = data?.company || {};
+      const templates = {
+        oneLiner: company.oneLiner || '',
+        productMarket: company.productMarket || '',
+        motivation: company.motivation || '',
+        researchChecklist: company.researchChecklist || '',
+        links: company.links || ''
+      };
 
       const hasAny =
         (prepDraft.company.oneLiner || '').trim() ||
         (prepDraft.company.productMarket || '').trim() ||
         (prepDraft.company.motivation || '').trim() ||
-        (prepDraft.company.researchChecklist || '').trim();
+        (prepDraft.company.researchChecklist || '').trim() ||
+        (prepDraft.company.links || '').trim();
 
       const replace = hasAny ? window.confirm(content.replaceAppendPrompt) : true;
 
@@ -1172,7 +1017,8 @@ function App() {
             oneLiner: mergeText(base.company.oneLiner, templates.oneLiner),
             productMarket: mergeText(base.company.productMarket, templates.productMarket),
             motivation: mergeText(base.company.motivation, templates.motivation),
-            researchChecklist: mergeText(base.company.researchChecklist, templates.researchChecklist)
+            researchChecklist: mergeText(base.company.researchChecklist, templates.researchChecklist),
+            links: mergeText(base.company.links, templates.links)
           }
         };
       });
@@ -1189,19 +1035,15 @@ function App() {
     if (!prepApp || !prepDraft) return;
     setIsRoleAutofillLoading(true);
     try {
-      const info = await fetchMicrolink(prepApp.url);
-      const description = (info?.description || '').trim();
-
-      // Best-effort: if JD text is empty, use the page meta description as a starting point.
-      const nextDraft = normalizePrep(prepDraft, prepApp);
-      if (!nextDraft.jd.text.trim() && description) {
-        nextDraft.jd.text = description;
-      }
-      if (!nextDraft.jd.keywords.length) {
-        nextDraft.jd.keywords = extractKeywordsFromText(nextDraft.jd.text || `${info?.title || ''} ${description}`);
-      }
-
-      const templates = buildRoleTemplates(language, prepApp, nextDraft, info);
+      const companyUrl = pickCompanyUrlFromLinks(prepDraft.company.links) || '';
+      const data = await invokeAutofillPrep({ mode: 'role', jobUrl: prepApp.url, companyUrl });
+      const role = data?.role || {};
+      const templates = {
+        summary: role.summary || '',
+        requirements: role.requirements || '',
+        fit: role.fit || ''
+      };
+      const responseKeywords = Array.isArray(data?.jd?.keywords) ? data.jd.keywords : [];
 
       const hasAny =
         (prepDraft.role.summary || '').trim() ||
@@ -1221,12 +1063,15 @@ function App() {
 
       setPrepDraft(prev => {
         const base = normalizePrep(prev, prepApp);
+        const mergedKeywords = Array.from(new Set([
+          ...(base.jd.keywords || []),
+          ...responseKeywords
+        ].map(s => String(s).trim()).filter(Boolean))).slice(0, 20);
         const merged = {
           ...base,
           jd: {
             ...base.jd,
-            text: nextDraft.jd.text,
-            keywords: nextDraft.jd.keywords
+            keywords: mergedKeywords
           },
           role: {
             ...base.role,
