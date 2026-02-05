@@ -1,8 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import Auth from './Auth';
 
 const STATUS_OPTIONS = ['Pending', 'Interview', 'Decline', 'Accepted'];
+const COLUMN_LABELS = {
+  company: 'Company',
+  position: 'Position',
+  date: 'Date Applied',
+  status: 'Status',
+  notes: 'Notes',
+  risk: 'Risk',
+  link: 'Link',
+  actions: 'Actions'
+};
+const DEFAULT_VISIBLE_COLUMNS = {
+  company: true,
+  position: true,
+  date: true,
+  status: true,
+  notes: true,
+  risk: true,
+  link: true,
+  actions: true
+};
 
 function App() {
   const [session, setSession] = useState(null)
@@ -36,6 +56,17 @@ function App() {
   const [applications, setApplications] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
+  const [editingCell, setEditingCell] = useState(null); // { id, field }
+  const [editingValue, setEditingValue] = useState('');
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    try {
+      const saved = localStorage.getItem('visibleColumns');
+      return saved ? { ...DEFAULT_VISIBLE_COLUMNS, ...JSON.parse(saved) } : DEFAULT_VISIBLE_COLUMNS;
+    } catch {
+      return DEFAULT_VISIBLE_COLUMNS;
+    }
+  });
 
   const filteredApplications = applications.filter(app => {
     const matchesSearch =
@@ -44,6 +75,118 @@ function App() {
     const matchesStatus = statusFilter === 'All' || app.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+    } catch {
+      // ignore storage errors
+    }
+  }, [visibleColumns]);
+
+  const companyOptions = useMemo(() => {
+    const set = new Set(applications.map(app => (app.company || '').trim()).filter(Boolean));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [applications]);
+
+  const positionOptions = useMemo(() => {
+    const set = new Set(applications.map(app => (app.position || '').trim()).filter(Boolean));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [applications]);
+
+  const normalizeText = (value) => (value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+  const normalizeUrl = (value) => {
+    if (!value) return '';
+    try {
+      const parsed = new URL(value);
+      return `${parsed.hostname}${parsed.pathname}`.replace(/\/+$/, '').toLowerCase();
+    } catch {
+      return value.toLowerCase().trim();
+    }
+  };
+
+  const getRiskAssessment = (app) => {
+    const url = (app.url || '').trim().toLowerCase();
+    if (!url) {
+      return { level: 'Unknown', score: 0, signals: ['No job URL'] };
+    }
+
+    let score = 0;
+    const signals = [];
+    const shorteners = ['bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly', 'is.gd', 'cutt.ly', 'rebrand.ly'];
+    const freeHosts = ['wixsite.com', 'weebly.com', 'blogspot.com', 'sites.google.com', 'github.io', 'notion.site', 'webflow.io'];
+    const knownJobBoards = ['linkedin.com', 'indeed.com', 'glassdoor.com', 'wellfound.com', 'lever.co', 'greenhouse.io'];
+
+    if (shorteners.some(domain => url.includes(domain))) {
+      score += 3;
+      signals.push('Shortened URL');
+    }
+    if (freeHosts.some(domain => url.includes(domain))) {
+      score += 2;
+      signals.push('Free hosting domain');
+    }
+    if (url.startsWith('http://')) {
+      score += 1;
+      signals.push('Not HTTPS');
+    }
+
+    const companyTokens = normalizeText(app.company)
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .split(' ')
+      .filter(token => token.length > 3);
+    const domain = url.replace(/^https?:\/\//, '').split('/')[0];
+    const companyMatchesDomain = companyTokens.some(token => domain.includes(token));
+    if (!companyMatchesDomain && !knownJobBoards.some(domainName => domain.includes(domainName))) {
+      score += 1;
+      signals.push('Company name not in domain');
+    }
+
+    const suspiciousWords = [
+      'quick money',
+      'no experience',
+      'instant hire',
+      'training fee',
+      'pay to start',
+      'wire money',
+      'crypto',
+      'deposit required'
+    ];
+    const text = normalizeText(`${app.position || ''} ${app.notes || ''}`);
+    if (suspiciousWords.some(word => text.includes(word))) {
+      score += 2;
+      signals.push('Suspicious wording');
+    }
+
+    let level = 'Low';
+    if (score >= 4) level = 'High';
+    else if (score >= 2) level = 'Medium';
+
+    return { level, score, signals: signals.length ? signals : ['No obvious signals'] };
+  };
+
+  const sortedApplications = useMemo(() => {
+    const { key, direction } = sortConfig;
+    const dir = direction === 'asc' ? 1 : -1;
+    const list = [...filteredApplications];
+    list.sort((a, b) => {
+      if (key === 'date') {
+        return (new Date(a.date) - new Date(b.date)) * dir;
+      }
+      if (key === 'status') {
+        return a.status.localeCompare(b.status) * dir;
+      }
+      if (key === 'risk') {
+        return (getRiskAssessment(a).score - getRiskAssessment(b).score) * dir;
+      }
+      const valueA = normalizeText(a[key]);
+      const valueB = normalizeText(b[key]);
+      return valueA.localeCompare(valueB) * dir;
+    });
+    return list;
+  }, [filteredApplications, sortConfig]);
+
+  const visibleColumnCount = Object.values(visibleColumns).filter(Boolean).length;
 
   // Calculate Stats
   const stats = {
@@ -117,6 +260,25 @@ function App() {
         }
       }
 
+      const urlKey = normalizeUrl(targetUrl);
+      const companyKey = normalizeText(company);
+      const positionKey = normalizeText(position);
+      const hasDuplicate = applications.some(app =>
+        (urlKey && normalizeUrl(app.url) === urlKey) ||
+        (companyKey && positionKey &&
+          normalizeText(app.company) === companyKey &&
+          normalizeText(app.position) === positionKey)
+      );
+
+      if (hasDuplicate) {
+        const proceed = window.confirm('This looks like a duplicate entry. Add anyway?');
+        if (!proceed) {
+          showToast('Duplicate skipped', 'info');
+          setLoading(false);
+          return;
+        }
+      }
+
       // Add to Supabase
       const newApp = {
         user_id: session.user.id,
@@ -177,6 +339,31 @@ function App() {
 
   const handleAddRow = () => {
     fetchMetadata(url);
+  };
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const startEditing = (app, field) => {
+    setEditingCell({ id: app.id, field });
+    setEditingValue(app[field] || '');
+  };
+
+  const cancelEditing = () => {
+    setEditingCell(null);
+    setEditingValue('');
+  };
+
+  const commitEditing = () => {
+    if (!editingCell) return;
+    handleUpdate(editingCell.id, editingCell.field, editingValue.trim());
+    cancelEditing();
   };
 
   const handleUpdate = async (id, field, value) => {
@@ -329,88 +516,181 @@ function App() {
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
+        <details className="columns-toggle">
+          <summary>Columns</summary>
+          <div className="columns-menu">
+            {Object.entries(COLUMN_LABELS).map(([key, label]) => (
+              <label key={key} className="columns-item">
+                <input
+                  type="checkbox"
+                  checked={visibleColumns[key]}
+                  onChange={() =>
+                    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }))
+                  }
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </details>
       </div>
 
       <div className="table-container">
+        <datalist id="company-options">
+          {companyOptions.map(option => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
+        <datalist id="position-options">
+          {positionOptions.map(option => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
         <table>
           <thead>
             <tr>
-              <th>Company</th>
-              <th>Position</th>
-              <th>Date Applied</th>
-              <th>Status</th>
-              <th>Notes</th>
-              <th>Link</th>
-              <th></th>
+              {visibleColumns.company && (
+                <th className="sortable" onClick={() => handleSort('company')}>
+                  Company {sortConfig.key === 'company' && <span className="sort-indicator">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              )}
+              {visibleColumns.position && (
+                <th className="sortable" onClick={() => handleSort('position')}>
+                  Position {sortConfig.key === 'position' && <span className="sort-indicator">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              )}
+              {visibleColumns.date && (
+                <th className="sortable" onClick={() => handleSort('date')}>
+                  Date Applied {sortConfig.key === 'date' && <span className="sort-indicator">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              )}
+              {visibleColumns.status && (
+                <th className="sortable" onClick={() => handleSort('status')}>
+                  Status {sortConfig.key === 'status' && <span className="sort-indicator">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              )}
+              {visibleColumns.notes && <th>Notes</th>}
+              {visibleColumns.risk && (
+                <th className="sortable" onClick={() => handleSort('risk')}>
+                  Risk {sortConfig.key === 'risk' && <span className="sort-indicator">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              )}
+              {visibleColumns.link && <th>Link</th>}
+              {visibleColumns.actions && <th></th>}
             </tr>
           </thead>
           <tbody>
-            {filteredApplications.map((app) => (
+            {sortedApplications.map((app) => {
+              const risk = getRiskAssessment(app);
+              return (
               <tr key={app.id}>
-                <td
-                  data-label="Company"
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="editable"
-                  onBlur={(e) => handleUpdate(app.id, 'company', e.target.innerText)}
-                >
-                  {app.company}
-                </td>
-                <td
-                  data-label="Position"
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="editable"
-                  onBlur={(e) => handleUpdate(app.id, 'position', e.target.innerText)}
-                >
-                  {app.position}
-                </td>
-                <td data-label="Date Applied">
-                  <input
-                    type="date"
-                    value={app.date}
-                    style={{ background: 'transparent', border: 'none', color: 'inherit', font: 'inherit' }}
-                    onChange={(e) => handleUpdate(app.id, 'date', e.target.value)}
-                  />
-                </td>
-                <td data-label="Status">
-                  <select
-                    value={app.status}
-                    className={`status-badge status-${app.status.toLowerCase()}`}
-                    onChange={(e) => handleUpdate(app.id, 'status', e.target.value)}
-                    style={{ border: 'none', outline: 'none', appearance: 'none', cursor: 'pointer' }}
+                {visibleColumns.company && (
+                  <td data-label="Company">
+                    {editingCell?.id === app.id && editingCell?.field === 'company' ? (
+                      <input
+                        className="cell-input"
+                        list="company-options"
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value)}
+                        onBlur={commitEditing}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditing();
+                          if (e.key === 'Escape') cancelEditing();
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <button className="cell-display" onClick={() => startEditing(app, 'company')}>
+                        {app.company}
+                      </button>
+                    )}
+                  </td>
+                )}
+                {visibleColumns.position && (
+                  <td data-label="Position">
+                    {editingCell?.id === app.id && editingCell?.field === 'position' ? (
+                      <input
+                        className="cell-input"
+                        list="position-options"
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value)}
+                        onBlur={commitEditing}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditing();
+                          if (e.key === 'Escape') cancelEditing();
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <button className="cell-display" onClick={() => startEditing(app, 'position')}>
+                        {app.position}
+                      </button>
+                    )}
+                  </td>
+                )}
+                {visibleColumns.date && (
+                  <td data-label="Date Applied">
+                    <input
+                      type="date"
+                      value={app.date}
+                      style={{ background: 'transparent', border: 'none', color: 'inherit', font: 'inherit' }}
+                      onChange={(e) => handleUpdate(app.id, 'date', e.target.value)}
+                    />
+                  </td>
+                )}
+                {visibleColumns.status && (
+                  <td data-label="Status">
+                    <select
+                      value={app.status}
+                      className={`status-badge status-${app.status.toLowerCase()}`}
+                      onChange={(e) => handleUpdate(app.id, 'status', e.target.value)}
+                      style={{ border: 'none', outline: 'none', appearance: 'none', cursor: 'pointer' }}
+                    >
+                      {STATUS_OPTIONS.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </td>
+                )}
+                {visibleColumns.notes && (
+                  <td
+                    data-label="Notes"
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="editable notes-cell"
+                    onBlur={(e) => handleUpdate(app.id, 'notes', e.target.innerText)}
                   >
-                    {STATUS_OPTIONS.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </td>
-                <td
-                  data-label="Notes"
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="editable notes-cell"
-                  onBlur={(e) => handleUpdate(app.id, 'notes', e.target.innerText)}
-                >
-                  {app.notes || ''}
-                </td>
-                <td data-label="Link">
-                  {app.url ? (
-                    <a href={app.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
-                      🔗 Visit
-                    </a>
-                  ) : '-'}
-                </td>
-                <td data-label="Actions" style={{ textAlign: 'right' }}>
-                  <button className="delete-btn" onClick={() => handleDelete(app.id)}>
-                    🗑️
-                  </button>
-                </td>
+                    {app.notes || ''}
+                  </td>
+                )}
+                {visibleColumns.risk && (
+                  <td data-label="Risk" title={`Heuristic signals: ${risk.signals.join(', ')}`}>
+                    <span className={`risk-badge risk-${risk.level.toLowerCase()}`}>
+                      {risk.level}
+                    </span>
+                  </td>
+                )}
+                {visibleColumns.link && (
+                  <td data-label="Link">
+                    {app.url ? (
+                      <a href={app.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+                        🔗 Visit
+                      </a>
+                    ) : '-'}
+                  </td>
+                )}
+                {visibleColumns.actions && (
+                  <td data-label="Actions" style={{ textAlign: 'right' }}>
+                    <button className="delete-btn" onClick={() => handleDelete(app.id)}>
+                      🗑️
+                    </button>
+                  </td>
+                )}
               </tr>
-            ))}
-            {filteredApplications.length === 0 && (
+            )})}
+            {sortedApplications.length === 0 && (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>
+                <td colSpan={visibleColumnCount || 1} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>
                   No applications yet. Paste a link above to start!
                 </td>
               </tr>

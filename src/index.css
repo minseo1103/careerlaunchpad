@@ -197,12 +197,58 @@ th {
   border-bottom: 1px solid var(--border-color);
 }
 
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover {
+  color: #374151;
+}
+
+.sort-indicator {
+  font-size: 0.75rem;
+  margin-left: 0.35rem;
+  color: var(--text-muted);
+}
+
 td {
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.95rem;
   color: var(--text-main);
   transition: background 0.2s;
+}
+
+.cell-display {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  width: 100%;
+  text-align: left;
+  cursor: text;
+}
+
+.cell-display:hover {
+  color: #111827;
+}
+
+.cell-input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  font: inherit;
+  color: var(--text-main);
+}
+
+.cell-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.15);
 }
 
 td.notes-cell {
@@ -236,6 +282,37 @@ tr:hover td {
   font-weight: 600;
   text-transform: capitalize;
   border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.risk-low {
+  background: #ecfdf5;
+  color: #15803d;
+}
+
+.risk-medium {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.risk-high {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.risk-unknown {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .status-pending {
@@ -484,7 +561,8 @@ tr:hover .delete-btn {
   }
 
   .search-input,
-  .filter-select {
+  .filter-select,
+  .columns-toggle {
     width: 100%;
     padding: 0.65rem;
     font-size: 16px; /* Prevents zoom on iOS */
@@ -589,6 +667,15 @@ tr:hover .delete-btn {
   .notes-cell {
     max-width: 120px;
     font-size: 0.8rem;
+  }
+
+  .cell-display {
+    text-align: right;
+  }
+
+  .cell-input {
+    max-width: 150px;
+    text-align: right;
   }
 
   /* Delete button styling for mobile */
@@ -724,6 +811,41 @@ tr:hover .delete-btn {
   border-color: var(--accent-primary) !important;
   box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
   outline: none;
+}
+
+.columns-toggle {
+  position: relative;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  min-width: 140px;
+}
+
+.columns-toggle summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.columns-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.columns-menu {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.columns-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 /* Auth Component Styles */
