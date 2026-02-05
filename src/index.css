@@ -689,6 +689,18 @@ tr:hover .delete-btn {
   font-size: 1rem;
 }
 
+.prep-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.prep-card-header h3 {
+  margin: 0;
+}
+
 .prep-wide {
   grid-column: 1 / -1;
 }

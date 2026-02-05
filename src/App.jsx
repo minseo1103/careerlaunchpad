@@ -29,7 +29,8 @@ const DEFAULT_PREP = {
     oneLiner: '',
     productMarket: '',
     motivation: '',
-    links: ''
+    links: '',
+    researchChecklist: ''
   },
   role: {
     summary: '',
@@ -91,6 +92,7 @@ const COPY = {
     companyProductMarket: 'Product / Market notes',
     companyMotivation: 'Why this company?',
     companyLinks: 'Links (one per line)',
+    companyChecklist: 'Research checklist',
     roleSummary: 'Role summary',
     roleRequirements: 'Key requirements',
     roleFit: 'My matching experiences',
@@ -101,6 +103,11 @@ const COPY = {
     interviewMyAnswers: 'My answers / stories',
     interviewQuestionsToAsk: 'Questions to ask the interviewer',
     interviewQuickStart: 'Quick Start',
+    companyQuickStart: 'Auto-fill',
+    roleQuickStart: 'Auto-fill',
+    replaceAppendPrompt: 'Replace existing notes with templates?\n\nOK = Replace\nCancel = Append',
+    autofillFailed: 'Auto-fill failed. Add the official company website to Links or paste the JD.',
+    loading: 'Loading...',
     cancel: 'Cancel',
     save: 'Save',
     saving: 'Saving...'
@@ -148,6 +155,7 @@ const COPY = {
     companyProductMarket: '제품/시장 메모',
     companyMotivation: '지원 동기',
     companyLinks: '링크 (줄바꿈으로 입력)',
+    companyChecklist: '리서치 체크리스트',
     roleSummary: '직무 요약',
     roleRequirements: '핵심 요건',
     roleFit: '내 경험 매칭',
@@ -158,6 +166,11 @@ const COPY = {
     interviewMyAnswers: '내 답변/사례',
     interviewQuestionsToAsk: '면접관에게 할 질문',
     interviewQuickStart: '기본 템플릿',
+    companyQuickStart: '자동 채우기',
+    roleQuickStart: '자동 채우기',
+    replaceAppendPrompt: '기존 메모를 템플릿으로 덮어쓸까요?\n\n확인 = 덮어쓰기\n취소 = 뒤에 추가',
+    autofillFailed: '자동 채우기에 실패했어요. Links에 회사 공식 사이트를 추가하거나 JD를 붙여넣어 주세요.',
+    loading: '불러오는 중...',
     cancel: '취소',
     save: '저장',
     saving: '저장 중...'
@@ -205,6 +218,8 @@ function App() {
   const [prepAppId, setPrepAppId] = useState(null);
   const [prepDraft, setPrepDraft] = useState(null);
   const [isPrepSaving, setIsPrepSaving] = useState(false);
+  const [isCompanyAutofillLoading, setIsCompanyAutofillLoading] = useState(false);
+  const [isRoleAutofillLoading, setIsRoleAutofillLoading] = useState(false);
   const [language, setLanguage] = useState(() => {
     try {
       return localStorage.getItem('uiLanguage') || 'en';
@@ -589,6 +604,211 @@ function App() {
     return { questions, myAnswers, questionsToAsk };
   };
 
+  const fetchMicrolink = async (targetUrl) => {
+    if (!targetUrl) return null;
+    const response = await fetch(`https://api.microlink.io?url=${encodeURIComponent(targetUrl)}`);
+    const json = await response.json();
+    if (json?.status !== 'success') {
+      const message = json?.error?.message || 'Microlink request failed';
+      throw new Error(message);
+    }
+    return json?.data || null;
+  };
+
+  const extractUrls = (text) => {
+    const input = String(text || '');
+    const matches = input.match(/https?:\/\/[^\s)]+/g);
+    return (matches || []).map(m => m.replace(/[.,;]$/, ''));
+  };
+
+  const pickCompanyUrlFromLinks = (linksText) => {
+    const urls = extractUrls(linksText);
+    if (!urls.length) return '';
+    const knownJobBoards = ['linkedin.com', 'indeed.com', 'glassdoor.com', 'wellfound.com', 'lever.co', 'greenhouse.io'];
+    const nonBoard = urls.find(u => {
+      try {
+        const host = new URL(u).hostname.toLowerCase();
+        return !knownJobBoards.some(domain => host.includes(domain));
+      } catch {
+        return false;
+      }
+    });
+    return nonBoard || urls[0];
+  };
+
+  const buildCompanyTemplates = (lang, app, prep, info) => {
+    const company = (app?.company || '').trim() || '(Company)';
+    const role = (app?.position || '').trim() || '(Role)';
+    const title = (info?.title || '').trim();
+    const description = (info?.description || '').trim();
+    const publisher = (info?.publisher || '').trim();
+    const source = (info?.url || app?.url || '').trim();
+
+    const derivedOneLiner = description
+      ? `${publisher && publisher !== company ? `${publisher} / ` : ''}${company}: ${description}`
+      : `${company} — (add what they do in one sentence)`;
+
+    const checklistEn = [
+      '[ ] Read homepage + product pages',
+      '[ ] Understand customer + problem',
+      '[ ] Scan pricing / business model (if applicable)',
+      '[ ] Read 2–3 recent posts/news',
+      '[ ] Identify 2 competitors',
+      '[ ] Prepare 3 “why us” reasons tied to the role'
+    ].join('\n');
+
+    const checklistKo = [
+      '[ ] 홈페이지/제품 페이지 읽기',
+      '[ ] 고객/문제 정의 정리',
+      '[ ] 가격/비즈니스 모델 확인(가능하면)',
+      '[ ] 최근 글/뉴스 2~3개 읽기',
+      '[ ] 경쟁사 2개 정리',
+      '[ ] 직무와 연결된 “왜 우리 회사?” 3가지 준비'
+    ].join('\n');
+
+    if (lang === 'ko') {
+      return {
+        oneLiner: derivedOneLiner.replace(`${company}: `, `${company} : `),
+        productMarket: [
+          `출처: ${source || '-'}`,
+          title ? `페이지 제목: ${title}` : null,
+          description ? `메타 설명: ${description}` : null,
+          '',
+          '제품/시장 메모(수정해서 채우기)',
+          '- 주요 제품/서비스:',
+          '- 타깃 고객:',
+          '- 해결하는 문제:',
+          '- 차별점/경쟁사:',
+          '- 최근 이슈/뉴스:'
+        ].filter(Boolean).join('\n'),
+        motivation: [
+          `${company} 지원 동기(초안)`,
+          `- 왜 ${company}?`,
+          '  1) ',
+          '  2) ',
+          '  3) ',
+          '',
+          `직무 연결(${role}):`,
+          '- JD 키워드/업무와 내 경험을 어떻게 연결할지:'
+        ].join('\n'),
+        researchChecklist: checklistKo
+      };
+    }
+
+    return {
+      oneLiner: derivedOneLiner,
+      productMarket: [
+        `Source: ${source || '-'}`,
+        title ? `Page title: ${title}` : null,
+        description ? `Meta description: ${description}` : null,
+        '',
+        'Product / Market notes (edit & fill)',
+        '- Core product/service:',
+        '- Target customers:',
+        '- Problem they solve:',
+        '- Differentiation / competitors:',
+        '- Recent news/updates:'
+      ].filter(Boolean).join('\n'),
+      motivation: [
+        `Why ${company}? (draft)`,
+        `- Why ${company}?`,
+        '  1) ',
+        '  2) ',
+        '  3) ',
+        '',
+        `Tie to role (${role}):`,
+        '- How my experience matches the role:'
+      ].join('\n'),
+      researchChecklist: checklistEn
+    };
+  };
+
+  const buildRoleTemplates = (lang, app, prep, info) => {
+    const company = (app?.company || '').trim() || '(Company)';
+    const role = (app?.position || '').trim() || '(Role)';
+    const description = (info?.description || '').trim();
+    const source = (info?.url || app?.url || '').trim();
+    const keywords = Array.isArray(prep?.jd?.keywords) ? prep.jd.keywords.slice(0, 10) : [];
+
+    if (lang === 'ko') {
+      return {
+        summary: [
+          `직무 요약: ${role} @ ${company}`,
+          '',
+          '주요 업무(추정/수정 필요)',
+          '- ',
+          '- ',
+          '- ',
+          '',
+          `출처: ${source || '-'}`,
+          description ? `메타 설명(참고): ${description}` : null
+        ].filter(Boolean).join('\n'),
+        requirements: [
+          '핵심 요건(초안)',
+          `- 핵심 키워드: ${keywords.length ? keywords.join(', ') : '(JD에서 Extract로 키워드를 뽑아봐)'}`,
+          '',
+          'Must-have',
+          '- ',
+          '- ',
+          '',
+          'Nice-to-have',
+          '- ',
+          '- '
+        ].join('\n'),
+        fit: [
+          '내 경험 매칭(작성 템플릿)',
+          '- 요건 1: ',
+          '  - 내 근거(프로젝트/경험): ',
+          '  - 임팩트(수치): ',
+          '- 요건 2: ',
+          '  - 내 근거(프로젝트/경험): ',
+          '  - 임팩트(수치): ',
+          '- 요건 3: ',
+          '  - 내 근거(프로젝트/경험): ',
+          '  - 임팩트(수치): '
+        ].join('\n')
+      };
+    }
+
+    return {
+      summary: [
+        `Role summary: ${role} @ ${company}`,
+        '',
+        'Core responsibilities (draft, edit as needed)',
+        '- ',
+        '- ',
+        '- ',
+        '',
+        `Source: ${source || '-'}`,
+        description ? `Meta description (reference): ${description}` : null
+      ].filter(Boolean).join('\n'),
+      requirements: [
+        'Key requirements (draft)',
+        `- Focus keywords: ${keywords.length ? keywords.join(', ') : '(Use Extract on the JD to get keywords)'}`,
+        '',
+        'Must-have',
+        '- ',
+        '- ',
+        '',
+        'Nice-to-have',
+        '- ',
+        '- '
+      ].join('\n'),
+      fit: [
+        'My matching experiences (template)',
+        '- Requirement 1: ',
+        '  - Evidence (project/experience): ',
+        '  - Impact (numbers): ',
+        '- Requirement 2: ',
+        '  - Evidence (project/experience): ',
+        '  - Impact (numbers): ',
+        '- Requirement 3: ',
+        '  - Evidence (project/experience): ',
+        '  - Impact (numbers): '
+      ].join('\n')
+    };
+  };
+
   const getRiskAssessment = (app) => {
     const url = (app.url || '').trim().toLowerCase();
     if (!url) {
@@ -916,6 +1136,115 @@ function App() {
         }
       };
     });
+  };
+
+  const applyCompanyQuickStart = async () => {
+    if (!prepApp || !prepDraft) return;
+    setIsCompanyAutofillLoading(true);
+    try {
+      const companyUrl = pickCompanyUrlFromLinks(prepDraft.company.links) || prepApp.url;
+      const info = await fetchMicrolink(companyUrl);
+      const templates = buildCompanyTemplates(language, prepApp, prepDraft, info);
+
+      const hasAny =
+        (prepDraft.company.oneLiner || '').trim() ||
+        (prepDraft.company.productMarket || '').trim() ||
+        (prepDraft.company.motivation || '').trim() ||
+        (prepDraft.company.researchChecklist || '').trim();
+
+      const replace = hasAny ? window.confirm(content.replaceAppendPrompt) : true;
+
+      const mergeText = (existing, next) => {
+        const ex = (existing || '').trim();
+        const nx = (next || '').trim();
+        if (!ex) return nx;
+        if (!nx) return ex;
+        if (replace) return nx;
+        return `${ex}\n\n---\n\n${nx}`;
+      };
+
+      setPrepDraft(prev => {
+        const base = prev || normalizePrep({}, prepApp);
+        return {
+          ...base,
+          company: {
+            ...base.company,
+            oneLiner: mergeText(base.company.oneLiner, templates.oneLiner),
+            productMarket: mergeText(base.company.productMarket, templates.productMarket),
+            motivation: mergeText(base.company.motivation, templates.motivation),
+            researchChecklist: mergeText(base.company.researchChecklist, templates.researchChecklist)
+          }
+        };
+      });
+      showToast('Company notes added', 'success');
+    } catch (error) {
+      console.error('Company autofill failed:', error);
+      showToast(content.autofillFailed, 'error');
+    } finally {
+      setIsCompanyAutofillLoading(false);
+    }
+  };
+
+  const applyRoleQuickStart = async () => {
+    if (!prepApp || !prepDraft) return;
+    setIsRoleAutofillLoading(true);
+    try {
+      const info = await fetchMicrolink(prepApp.url);
+      const description = (info?.description || '').trim();
+
+      // Best-effort: if JD text is empty, use the page meta description as a starting point.
+      const nextDraft = normalizePrep(prepDraft, prepApp);
+      if (!nextDraft.jd.text.trim() && description) {
+        nextDraft.jd.text = description;
+      }
+      if (!nextDraft.jd.keywords.length) {
+        nextDraft.jd.keywords = extractKeywordsFromText(nextDraft.jd.text || `${info?.title || ''} ${description}`);
+      }
+
+      const templates = buildRoleTemplates(language, prepApp, nextDraft, info);
+
+      const hasAny =
+        (prepDraft.role.summary || '').trim() ||
+        (prepDraft.role.requirements || '').trim() ||
+        (prepDraft.role.fit || '').trim();
+
+      const replace = hasAny ? window.confirm(content.replaceAppendPrompt) : true;
+
+      const mergeText = (existing, next) => {
+        const ex = (existing || '').trim();
+        const nx = (next || '').trim();
+        if (!ex) return nx;
+        if (!nx) return ex;
+        if (replace) return nx;
+        return `${ex}\n\n---\n\n${nx}`;
+      };
+
+      setPrepDraft(prev => {
+        const base = normalizePrep(prev, prepApp);
+        const merged = {
+          ...base,
+          jd: {
+            ...base.jd,
+            text: nextDraft.jd.text,
+            keywords: nextDraft.jd.keywords
+          },
+          role: {
+            ...base.role,
+            summary: mergeText(base.role.summary, templates.summary),
+            requirements: mergeText(base.role.requirements, templates.requirements),
+            fit: mergeText(base.role.fit, templates.fit)
+          }
+        };
+        return merged;
+      });
+
+      showToast('Role notes added', 'success');
+    } catch (error) {
+      console.error('Role autofill failed:', error);
+      showToast(content.autofillFailed, 'error');
+    } finally {
+      setIsRoleAutofillLoading(false);
+    }
   };
 
   const savePrep = async () => {
@@ -1432,7 +1761,17 @@ function App() {
 
             <div className="prep-grid">
               <div className="prep-card">
-                <h3>{content.prepCompany}</h3>
+                <div className="prep-card-header">
+                  <h3>{content.prepCompany}</h3>
+                  <button
+                    className="secondary-btn"
+                    onClick={applyCompanyQuickStart}
+                    disabled={isCompanyAutofillLoading}
+                    type="button"
+                  >
+                    {isCompanyAutofillLoading ? content.loading : content.companyQuickStart}
+                  </button>
+                </div>
                 <label className="form-field">
                   <span className="form-label">{content.companyOneLiner}</span>
                   <textarea
@@ -1469,10 +1808,29 @@ function App() {
                     rows={3}
                   />
                 </label>
+                <label className="form-field">
+                  <span className="form-label">{content.companyChecklist}</span>
+                  <textarea
+                    className="form-textarea"
+                    value={prepDraft.company.researchChecklist}
+                    onChange={(e) => updatePrep('company', 'researchChecklist', e.target.value)}
+                    rows={5}
+                  />
+                </label>
               </div>
 
               <div className="prep-card">
-                <h3>{content.prepRole}</h3>
+                <div className="prep-card-header">
+                  <h3>{content.prepRole}</h3>
+                  <button
+                    className="secondary-btn"
+                    onClick={applyRoleQuickStart}
+                    disabled={isRoleAutofillLoading}
+                    type="button"
+                  >
+                    {isRoleAutofillLoading ? content.loading : content.roleQuickStart}
+                  </button>
+                </div>
                 <label className="form-field">
                   <span className="form-label">{content.roleSummary}</span>
                   <textarea
