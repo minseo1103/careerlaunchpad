@@ -100,6 +100,7 @@ const COPY = {
     interviewQuestions: 'Likely questions',
     interviewMyAnswers: 'My answers / stories',
     interviewQuestionsToAsk: 'Questions to ask the interviewer',
+    interviewQuickStart: 'Quick Start',
     cancel: 'Cancel',
     save: 'Save',
     saving: 'Saving...'
@@ -156,6 +157,7 @@ const COPY = {
     interviewQuestions: '예상 질문',
     interviewMyAnswers: '내 답변/사례',
     interviewQuestionsToAsk: '면접관에게 할 질문',
+    interviewQuickStart: '기본 템플릿',
     cancel: '취소',
     save: '저장',
     saving: '저장 중...'
@@ -355,6 +357,236 @@ function App() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 12)
       .map(([word]) => word);
+  };
+
+  const buildInterviewTemplates = (lang, app, prep) => {
+    const keywords = Array.isArray(prep?.jd?.keywords) ? prep.jd.keywords.slice(0, 6) : [];
+    const role = (app?.position || '').trim();
+    const company = (app?.company || '').trim();
+
+    const topicQuestionsEn = {
+      sql: [
+        'Explain INNER vs LEFT JOIN. When would you use each?',
+        'How would you debug and optimize a slow query?'
+      ],
+      python: [
+        'How do you structure a data pipeline/script for maintainability?',
+        'What are common pitfalls with Python performance and how do you profile?'
+      ],
+      react: [
+        'Explain state vs props. When would you lift state up?',
+        'How do you prevent unnecessary re-renders in React?'
+      ],
+      javascript: [
+        'Explain the event loop (microtasks vs macrotasks).',
+        'What is a closure and where have you used it?'
+      ],
+      node: [
+        'How do you handle async work and errors in Node.js?',
+        'What are common API reliability issues and how do you mitigate them?'
+      ],
+      api: [
+        'Design a REST API endpoint for creating and listing applications.',
+        'How do you version an API and handle backwards compatibility?'
+      ],
+      robotics: [
+        'What is PID control and where would you apply it?',
+        'How would you validate sensor data and handle noise?'
+      ],
+      data: [
+        'How do you choose metrics and define success for an analysis?',
+        'Walk through an analysis you did end-to-end (data → insights → action).'
+      ],
+      ml: [
+        'How do you evaluate a model and avoid overfitting?',
+        'Explain precision/recall and when each matters.'
+      ]
+    };
+
+    const topicQuestionsKo = {
+      sql: [
+        'INNER JOIN과 LEFT JOIN의 차이와 각각의 사용 사례를 설명해줘.',
+        '느린 쿼리를 어떻게 디버깅하고 최적화할지 과정을 설명해줘.'
+      ],
+      python: [
+        '유지보수가 쉬운 파이썬 스크립트/파이프라인 구조를 어떻게 잡는지 설명해줘.',
+        '파이썬 성능 이슈를 어떻게 프로파일링하고 개선하는지 말해줘.'
+      ],
+      react: [
+        'state와 props의 차이, state를 상위로 올려야 하는 경우를 설명해줘.',
+        'React에서 불필요한 리렌더링을 줄이는 방법을 설명해줘.'
+      ],
+      javascript: [
+        '이벤트 루프(마이크로태스크/매크로태스크)를 설명해줘.',
+        '클로저(closure)가 무엇이고 어떤 상황에서 사용했는지 말해줘.'
+      ],
+      node: [
+        'Node.js에서 비동기 처리와 에러 처리를 어떻게 하는지 설명해줘.',
+        'API 신뢰성 문제(타임아웃, 재시도, 레이트리밋 등)를 어떻게 다루는지 말해줘.'
+      ],
+      api: [
+        '지원서 생성/조회 기능을 위한 REST API를 어떻게 설계할지 설명해줘.',
+        'API 버저닝과 하위 호환성은 어떻게 관리할지 말해줘.'
+      ],
+      robotics: [
+        'PID 제어가 무엇이고 어떤 상황에서 쓰는지 설명해줘.',
+        '센서 노이즈를 다루고 데이터를 검증하는 방법을 말해줘.'
+      ],
+      data: [
+        '분석에서 성공 지표를 어떻게 선택하고 정의하는지 말해줘.',
+        '내가 했던 분석을 end-to-end로 설명해줘(데이터→인사이트→액션).'
+      ],
+      ml: [
+        '모델을 평가하고 과적합을 피하는 방법을 설명해줘.',
+        '정밀도/재현율(precision/recall)과 각각이 중요한 상황을 말해줘.'
+      ]
+    };
+
+    const normalizeKey = (value) => normalizeText(value).replace(/[^a-z0-9+.#/\\-]/g, '');
+    const topicHits = new Set();
+    for (const kw of keywords) {
+      const k = normalizeKey(kw);
+      if (!k) continue;
+      if (k.includes('sql') || k.includes('postgres') || k.includes('mysql')) topicHits.add('sql');
+      if (k.includes('python')) topicHits.add('python');
+      if (k.includes('react')) topicHits.add('react');
+      if (k.includes('javascript') || k === 'js' || k.includes('typescript') || k === 'ts') topicHits.add('javascript');
+      if (k.includes('node') || k.includes('express')) topicHits.add('node');
+      if (k.includes('api') || k.includes('rest') || k.includes('graphql')) topicHits.add('api');
+      if (k.includes('robot') || k.includes('ros') || k.includes('slam')) topicHits.add('robotics');
+      if (k.includes('data') || k.includes('analytics') || k.includes('tableau') || k.includes('excel')) topicHits.add('data');
+      if (k.includes('ml') || k.includes('machinelearning') || k.includes('model') || k.includes('pytorch') || k.includes('tensorflow')) topicHits.add('ml');
+    }
+
+    const topicQuestions = [];
+    const bank = lang === 'ko' ? topicQuestionsKo : topicQuestionsEn;
+    for (const topic of Array.from(topicHits)) {
+      for (const q of bank[topic] || []) topicQuestions.push(q);
+    }
+
+    if (lang === 'ko') {
+      const questions = [
+        `대상: ${company || '(회사)'} / ${role || '(직무)'}`,
+        '',
+        '행동/커뮤니케이션',
+        '- 1분 자기소개(핵심 경험 2~3개 + 이 직무에 맞는 이유)',
+        '- 왜 이 회사? 왜 이 직무?',
+        '- 애매한 요구사항/불확실성을 다뤘던 경험은?',
+        '- 의견 충돌/피드백을 주고받은 경험은?',
+        '- 실패 경험과 배운 점은?',
+        '',
+        '프로젝트 딥다이브',
+        '- 가장 자신 있는 프로젝트 1~2개: 문제/제약/트레이드오프/임팩트(수치)',
+        '- 내가 맡은 역할과 협업 방식',
+        '',
+        `키워드 포커스: ${keywords.length ? keywords.join(', ') : '(JD에서 Extract로 키워드를 뽑아봐)'}`,
+        ...(topicQuestions.length ? ['','기술/직무 질문','- ' + topicQuestions.join('\n- ')] : []),
+        '',
+        '실무/운영',
+        '- 첫 2주에 무엇을 배우고 어떤 결과를 내고 싶나?',
+        '- 일정이 밀렸을 때 우선순위는 어떻게 정하나?'
+      ].join('\n');
+
+      const myAnswers = [
+        '1) 1분 자기소개 스크립트',
+        '-',
+        '',
+        '2) STAR 스토리 3개 준비',
+        'Story A (리더십/주도성)',
+        'S:',
+        'T:',
+        'A:',
+        'R: (수치/결과)',
+        '배운 점:',
+        '',
+        'Story B (기술적 문제 해결)',
+        'S:',
+        'T:',
+        'A:',
+        'R:',
+        '배운 점:',
+        '',
+        'Story C (협업/갈등/커뮤니케이션)',
+        'S:',
+        'T:',
+        'A:',
+        'R:',
+        '배운 점:'
+      ].join('\n');
+
+      const questionsToAsk = [
+        '질문 리스트(면접관에게)',
+        '- 이 직무에서 성공의 기준은 무엇인가요? (30/60/90일)',
+        '- 팀 구조와 협업 방식은 어떤가요?',
+        '- 지금 가장 큰 문제/우선순위는 무엇인가요?',
+        '- 인턴/신입에게 기대하는 결과물은 무엇인가요?',
+        '- 기술 스택/툴링/코드 리뷰 문화는 어떤가요?',
+        '- 다음 단계와 타임라인은 어떻게 되나요?'
+      ].join('\n');
+
+      return { questions, myAnswers, questionsToAsk };
+    }
+
+    const questions = [
+      `Target: ${company || '(Company)'} / ${role || '(Role)'}`,
+      '',
+      'Behavioral',
+      '- 60-second pitch (2–3 relevant experiences + why this role)',
+      '- Why this company? Why this role?',
+      '- A time you handled ambiguity or unclear requirements',
+      '- A time you disagreed with a teammate / handled feedback',
+      '- A failure and what you learned',
+      '',
+      'Project Deep Dive',
+      '- 1–2 best projects: problem, constraints, tradeoffs, impact (numbers)',
+      '- Your role + collaboration + what you would do next',
+      '',
+      `Focus keywords: ${keywords.length ? keywords.join(', ') : '(Use Extract on the JD to get keywords)'}`,
+      ...(topicQuestions.length ? ['','Role / Technical','- ' + topicQuestions.join('\n- ')] : []),
+      '',
+      'Execution',
+      '- What would you aim to learn/deliver in the first 2 weeks?',
+      '- How do you prioritize when everything feels urgent?'
+    ].join('\n');
+
+    const myAnswers = [
+      '1) 60-second pitch script',
+      '-',
+      '',
+      '2) STAR stories (prepare 3)',
+      'Story A (Leadership / ownership)',
+      'S:',
+      'T:',
+      'A:',
+      'R: (numbers)',
+      'Learnings:',
+      '',
+      'Story B (Technical problem solving)',
+      'S:',
+      'T:',
+      'A:',
+      'R:',
+      'Learnings:',
+      '',
+      'Story C (Collaboration / conflict)',
+      'S:',
+      'T:',
+      'A:',
+      'R:',
+      'Learnings:'
+    ].join('\n');
+
+    const questionsToAsk = [
+      'Questions to ask the interviewer',
+      '- What does success look like in the first 30/60/90 days?',
+      '- How is the team structured and how do you collaborate?',
+      '- What are the biggest challenges the team is tackling right now?',
+      '- What do you expect from interns/new grads on this team?',
+      '- What is the tech stack / tooling / code review culture like?',
+      '- What are the next steps and timeline?'
+    ].join('\n');
+
+    return { questions, myAnswers, questionsToAsk };
   };
 
   const getRiskAssessment = (app) => {
@@ -647,6 +879,42 @@ function App() {
       const base = prev || normalizePrep({}, null);
       const keywords = extractKeywordsFromText(base.jd.text);
       return { ...base, jd: { ...base.jd, keywords } };
+    });
+  };
+
+  const applyInterviewQuickStart = () => {
+    if (!prepApp || !prepDraft) return;
+    const templates = buildInterviewTemplates(language, prepApp, prepDraft);
+
+    const hasAny =
+      (prepDraft.interview.questions || '').trim() ||
+      (prepDraft.interview.myAnswers || '').trim() ||
+      (prepDraft.interview.questionsToAsk || '').trim();
+
+    const replace = hasAny
+      ? window.confirm('Replace existing Interview Prep notes with templates?\n\nOK = Replace\nCancel = Append')
+      : true;
+
+    const mergeText = (existing, next) => {
+      const ex = (existing || '').trim();
+      const nx = (next || '').trim();
+      if (!ex) return nx;
+      if (!nx) return ex;
+      if (replace) return nx;
+      return `${ex}\n\n---\n\n${nx}`;
+    };
+
+    setPrepDraft(prev => {
+      const base = prev || normalizePrep({}, prepApp);
+      return {
+        ...base,
+        interview: {
+          ...base.interview,
+          questions: mergeText(base.interview.questions, templates.questions),
+          myAnswers: mergeText(base.interview.myAnswers, templates.myAnswers),
+          questionsToAsk: mergeText(base.interview.questionsToAsk, templates.questionsToAsk)
+        }
+      };
     });
   };
 
@@ -1263,7 +1531,12 @@ function App() {
               </div>
 
               <div className="prep-card prep-wide">
-                <h3>{content.prepInterview}</h3>
+                <div className="prep-wide-header">
+                  <h3>{content.prepInterview}</h3>
+                  <button className="secondary-btn" onClick={applyInterviewQuickStart} type="button">
+                    {content.interviewQuickStart}
+                  </button>
+                </div>
                 <div className="prep-two-col">
                   <label className="form-field">
                     <span className="form-label">{content.interviewQuestions}</span>
