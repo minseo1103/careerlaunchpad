@@ -23,6 +23,74 @@ const DEFAULT_VISIBLE_COLUMNS = {
   link: true,
   actions: true
 };
+const COPY = {
+  en: {
+    helpTitle: 'How to Use Career Launchpad',
+    helpIntro: 'Track applications in a spreadsheet-style table. Add, edit, sort, and filter your entries to stay organized.',
+    sectionBasics: 'Basics',
+    basics: [
+      'Paste a job URL and click Add Application to create a new entry.',
+      'Click any Company or Position cell to edit. Press Enter to save, Esc to cancel.',
+      'Use the search box and status filter to narrow results.'
+    ],
+    sectionTable: 'Table Controls',
+    table: [
+      'Click any column header to sort. Click again to toggle ascending/descending.',
+      'Open Columns to hide/show fields and personalize your view.'
+    ],
+    sectionDuplicates: 'Duplicate Check',
+    duplicates: [
+      'If a URL or Company + Position matches an existing entry, you will see a confirmation prompt before adding.'
+    ],
+    sectionRisk: 'Risk Badge (Heuristic)',
+    risk: [
+      'Risk is a heuristic estimate based on signals like URL shorteners, non-HTTPS links, free hosting domains, and suspicious wording.',
+      'Low/Medium/High is not a verdict. Always verify company legitimacy independently.'
+    ],
+    sectionPrivacy: 'Privacy',
+    privacy: [
+      'Your data is stored in your Supabase project. No third-party risk databases are used.'
+    ],
+    close: 'Close',
+    help: 'Help',
+    language: 'Language',
+    langEn: 'English',
+    langKo: 'Korean'
+  },
+  ko: {
+    helpTitle: 'Career Launchpad 사용 방법',
+    helpIntro: '스프레드시트 스타일 테이블에서 지원서를 관리합니다. 추가, 편집, 정렬, 필터링을 활용하세요.',
+    sectionBasics: '기본 사용법',
+    basics: [
+      '채용 공고 URL을 붙여넣고 Add Application을 눌러 항목을 추가합니다.',
+      'Company 또는 Position 셀을 클릭해 편집합니다. Enter 저장, Esc 취소.',
+      '검색창과 상태 필터로 결과를 좁힙니다.'
+    ],
+    sectionTable: '테이블 조작',
+    table: [
+      '컬럼 헤더 클릭으로 정렬, 다시 클릭하면 오름/내림차순 전환.',
+      'Columns 메뉴에서 컬럼 표시/숨김을 설정합니다.'
+    ],
+    sectionDuplicates: '중복 체크',
+    duplicates: [
+      'URL 또는 Company + Position이 기존 항목과 같으면 추가 전에 확인 팝업이 뜹니다.'
+    ],
+    sectionRisk: 'Risk 배지 (휴리스틱)',
+    risk: [
+      'Risk는 URL 단축, HTTP 링크, 무료 호스팅 도메인, 의심 문구 등의 신호로 추정합니다.',
+      'Low/Medium/High는 판단 참고용이며 확정이 아닙니다. 반드시 직접 검증하세요.'
+    ],
+    sectionPrivacy: '개인정보',
+    privacy: [
+      '데이터는 본인 Supabase 프로젝트에 저장됩니다. 외부 리스크 DB는 사용하지 않습니다.'
+    ],
+    close: '닫기',
+    help: '도움말',
+    language: '언어',
+    langEn: '영어',
+    langKo: '한국어'
+  }
+};
 
 function App() {
   const [session, setSession] = useState(null)
@@ -59,6 +127,14 @@ function App() {
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   const [editingCell, setEditingCell] = useState(null); // { id, field }
   const [editingValue, setEditingValue] = useState('');
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [language, setLanguage] = useState(() => {
+    try {
+      return localStorage.getItem('uiLanguage') || 'en';
+    } catch {
+      return 'en';
+    }
+  });
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
       const saved = localStorage.getItem('visibleColumns');
@@ -83,6 +159,25 @@ function App() {
       // ignore storage errors
     }
   }, [visibleColumns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('uiLanguage', language);
+    } catch {
+      // ignore storage errors
+    }
+  }, [language]);
+
+  useEffect(() => {
+    if (!isHelpOpen) return;
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsHelpOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isHelpOpen]);
 
   const companyOptions = useMemo(() => {
     const set = new Set(applications.map(app => (app.company || '').trim()).filter(Boolean));
@@ -441,6 +536,8 @@ function App() {
     return <Auth />;
   }
 
+  const content = COPY[language] || COPY.en;
+
   return (
     <div className="container">
       {isInitialLoading && (
@@ -454,6 +551,24 @@ function App() {
           <p className="subtitle">Manage and track your career opportunities with ease.</p>
         </div>
         <div className="user-actions">
+          <div className="language-toggle">
+            <span className="language-label">{content.language}</span>
+            <button
+              className={`language-btn ${language === 'en' ? 'active' : ''}`}
+              onClick={() => setLanguage('en')}
+            >
+              {content.langEn}
+            </button>
+            <button
+              className={`language-btn ${language === 'ko' ? 'active' : ''}`}
+              onClick={() => setLanguage('ko')}
+            >
+              {content.langKo}
+            </button>
+          </div>
+          <button className="help-btn" onClick={() => setIsHelpOpen(true)}>
+            {content.help}
+          </button>
           <span className="user-email">{session.user.email}</span>
           <button className="delete-btn logout-btn" onClick={handleLogout}>
             Log Out
@@ -712,6 +827,71 @@ function App() {
             </button>
           )}
           <button className="toast-close-btn" onClick={closeToast}>×</button>
+        </div>
+      )}
+
+      {isHelpOpen && (
+        <div className="modal-overlay" onClick={() => setIsHelpOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{content.helpTitle}</h2>
+              <button className="modal-close" onClick={() => setIsHelpOpen(false)}>
+                ×
+              </button>
+            </div>
+            <p className="modal-intro">{content.helpIntro}</p>
+
+            <div className="modal-section">
+              <h3>{content.sectionBasics}</h3>
+              <ul>
+                {content.basics.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="modal-section">
+              <h3>{content.sectionTable}</h3>
+              <ul>
+                {content.table.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="modal-section">
+              <h3>{content.sectionDuplicates}</h3>
+              <ul>
+                {content.duplicates.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="modal-section">
+              <h3>{content.sectionRisk}</h3>
+              <ul>
+                {content.risk.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="modal-section">
+              <h3>{content.sectionPrivacy}</h3>
+              <ul>
+                {content.privacy.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="modal-actions">
+              <button className="add-btn" onClick={() => setIsHelpOpen(false)}>
+                {content.close}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

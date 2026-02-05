@@ -468,6 +468,142 @@ tr:hover .delete-btn {
   align-items: center;
   gap: 1rem;
   white-space: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.help-btn {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.help-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.language-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.language-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-right: 0.15rem;
+}
+
+.language-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.language-btn.active {
+  background: #111827;
+  color: #fff;
+}
+
+.language-btn:hover {
+  color: #111827;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1.5rem;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+  max-width: 720px;
+  width: 100%;
+  padding: 1.5rem 1.75rem;
+  color: var(--text-main);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.modal-header h2 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-close:hover {
+  color: var(--text-main);
+}
+
+.modal-intro {
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.modal-section {
+  margin-bottom: 1rem;
+}
+
+.modal-section h3 {
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.modal-section ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-main);
+}
+
+.modal-section li {
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
 }
 
 .user-email {
@@ -505,6 +641,24 @@ tr:hover .delete-btn {
   .user-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .language-toggle {
+    order: 1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .help-btn {
+    order: 2;
+  }
+
+  .user-email {
+    order: 3;
+  }
+
+  .logout-btn {
+    order: 4;
   }
 
   .user-email {
